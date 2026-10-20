@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -102,7 +103,9 @@ class CliTest(unittest.TestCase):
                     auth,
                     "ACCOUNT_SERVICE_LOGIN",
                     f"http://127.0.0.1:{server.server_port}/pass/serviceLogin?_json=true&sid=xiaomiio",
-                ), patch.object(cloud, "CN_BASE_URL", f"http://127.0.0.1:{server.server_port}/app"):
+                ), patch.object(cloud, "CN_BASE_URL", f"http://127.0.0.1:{server.server_port}/app"), patch.dict(
+                    os.environ, {"MI_SCALE_NO_ENV": "1"}
+                ):
                     code = cli.main(
                         [
                             "export",

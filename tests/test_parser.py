@@ -71,6 +71,57 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(measurement.to_row(full=True)["right_arm_muscle_kg"], "2.7")
         self.assertEqual(measurement.to_dict(full=True)["extras"]["ram"], "2.7")
 
+    def test_s800_source2(self):
+        import json
+
+        item = {
+            "model": "xiaomi.scales.ms116",
+            "createTime": 1792299577000,
+            "did": "blt.3.1abc",
+            "fromSource": 2,
+            "data": json.dumps(
+                {
+                    "weight": "63.15",
+                    "bmi": "20.8",
+                    "bfp": "16.5",
+                    "bwp": "61.8",
+                    "bmc": "2.9",
+                    "ma": "35.0",
+                    "slm": "49.8",
+                    "pm": "10.3",
+                    "vfl": "4.0",
+                    "bmr": "1508.0",
+                    "sbc": "79.0",
+                    "heartRate": 0,
+                    "smm": "28.6",
+                    "bt": "4.0",
+                    "pp": "16.3",
+                    "height": "174",
+                    "user": {"name": "Alice", "deviceId": "blt.3.1abc"},
+                }
+            ),
+        }
+        measurement = parse_record(item)
+        assert measurement is not None
+        self.assertEqual(measurement.body_fat_pct, 16.5)
+        self.assertEqual(measurement.heart_rate_bpm, None)
+        self.assertEqual(measurement.source, "blt.3.1abc")
+        self.assertEqual(measurement.extras["pp"], "16.3")
+
+    def test_source2_falls_back_to_did(self):
+        import json
+
+        item = {
+            "model": "xiaomi.scales.ms116",
+            "createTime": 1792299577000,
+            "did": "blt.3.1abc",
+            "fromSource": 2,
+            "data": json.dumps({"weight": "63.15", "user": {"name": "Alice"}}),
+        }
+        measurement = parse_record(item)
+        assert measurement is not None
+        self.assertEqual(measurement.source, "blt.3.1abc")
+
     def test_source1(self):
         import json
 

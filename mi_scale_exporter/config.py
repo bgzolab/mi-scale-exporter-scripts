@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,9 +12,84 @@ from typing import Any, Dict, Optional
 
 from .cloud import DEFAULT_MODEL, DEFAULT_REGION
 
+ENV_USER_KEYS = ("XIAOMI_USER_ID", "XIAOMI_ACCOUNT", "ACCOUNT", "USER_ID", "MI_USER_ID")
+ENV_TOKEN_KEYS = ("XIAOMI_PASS_TOKEN", "PASS_TOKEN", "MI_PASS_TOKEN")
+
 
 class ConfigError(RuntimeError):
     pass
+
+
+def _strip_quotes(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    return value
+
+
+def _first_entry(entries: Dict[str, str], names: tuple) -> Optional[str]:
+    for name in names:
+        value = entries.get(name)
+        if value:
+            return value
+    return None
+
+
+def load_env_file(path: Optional[Path] = None) -> Dict[str, str]:
+    """Load Xiaomi credentials from a local ``.env`` file.
+
+    Supported formats::
+
+        XIAOMI_USER_ID=123456789
+        XIAOMI_PASS_TOKEN=V1:....
+
+    or the raw two-line format::
+
+        123456789
+        V1:....
+
+    Existing environment variables are never overwritten.
+    """
+    path = path or (Path.cwd() / ".env")
+    if not path.exists():
+        return {}
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except OSError as exc:
+        raise ConfigError(f"无法读取 {path}: {exc}") from exc
+
+    entries: Dict[str, str] = {}
+    raw_lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].strip()
+        match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$", line)
+        if match:
+            entries[match.group(1)] = _strip_quotes(match.group(2))
+        else:
+            raw_lines.append(_strip_quotes(line))
+
+    user_id = _first_entry(entries, ENV_USER_KEYS)
+    pass_token = _first_entry(entries, ENV_TOKEN_KEYS)
+
+    # The user's .env may be just two raw lines: account, then pass token.
+    if user_id is None and pass_token is None and len(raw_lines) >= 2:
+        first, second = raw_lines[0], raw_lines[1]
+        if first.isdigit():
+            user_id, pass_token = first, second
+        elif second.isdigit():
+            user_id, pass_token = second, first
+        else:
+            user_id, pass_token = first, second
+
+    if user_id:
+        os.environ.setdefault("XIAOMI_USER_ID", user_id)
+    if pass_token:
+        os.environ.setdefault("XIAOMI_PASS_TOKEN", pass_token)
+    return {"user_id": user_id or "", "pass_token": pass_token or ""}
 
 
 def default_config_path() -> Path:

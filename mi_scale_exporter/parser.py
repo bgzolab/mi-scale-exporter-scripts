@@ -271,7 +271,7 @@ def parse_record(item: Dict[str, Any]) -> Optional[Measurement]:
     if from_source == 1:
         source = merged.get("reportFrom")
     elif from_source == 2:
-        source = _nested(merged, "user.deviceId")
+        source = _nested(merged, "user.deviceId") or item.get("did") or data.get("mid")
     elif from_source == 3:
         source = item.get("did") or data.get("mid")
     else:

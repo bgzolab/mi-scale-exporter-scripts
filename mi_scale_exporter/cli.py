@@ -23,6 +23,7 @@ from .config import (
     ConfigError,
     default_config_path,
     load_config,
+    load_env_file,
     resolve_connection_settings,
     save_config,
 )
@@ -326,6 +327,12 @@ def command_export(args: argparse.Namespace) -> int:
 def main(argv: Optional[list[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if not os.environ.get("MI_SCALE_NO_ENV"):
+        try:
+            load_env_file()
+        except ConfigError as exc:
+            _error(str(exc))
+            return 1
     if args.command == "login":
         return command_login(args)
     if args.command == "export":
