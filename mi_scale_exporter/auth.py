@@ -13,9 +13,9 @@ Only the standard library is required.
 from __future__ import annotations
 
 import base64
+import http.client
 import json
 import random
-import socket
 import string
 import time
 import urllib.error
@@ -102,7 +102,7 @@ def _open_json(opener: urllib.request.OpenerDirector, request: urllib.request.Re
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise AuthError(f"小米账号 HTTP {exc.code}: {body[:200]}") from exc
-    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+    except (OSError, http.client.HTTPException) as exc:
         raise AuthError(f"无法连接小米账号服务: {exc}") from exc
     return parse_login_json(body)
 
@@ -181,7 +181,7 @@ def _finish_login(
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise AuthError(f"获取小米服务凭证失败 (HTTP {exc.code}): {body[:200]}") from exc
-    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+    except (OSError, http.client.HTTPException) as exc:
         raise AuthError(f"获取小米服务凭证失败: {exc}") from exc
 
     cookie_header = _cookie_header(opener)
@@ -291,7 +291,7 @@ def poll_qr_login(
             last_error = exc
         except AuthError:
             raise
-        except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+        except (OSError, http.client.HTTPException) as exc:
             last_error = exc
 
         if on_wait:

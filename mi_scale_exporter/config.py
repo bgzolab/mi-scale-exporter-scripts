@@ -24,7 +24,10 @@ ENV_FILE_TOKEN_KEYS = ENV_TOKEN_KEYS + ("PASS_TOKEN",)
 def get_env(names: tuple, default: Any = None, validator=None) -> Any:
     for name in names:
         value = os.environ.get(name)
-        if value not in (None, "") and (validator is None or validator(value)):
+        if value is None:
+            continue
+        value = value.strip()
+        if value and (validator is None or validator(value)):
             return value
     return default
 
@@ -173,6 +176,8 @@ def get_setting(
         env_value = get_env(tuple(env_name), validator=validator)
     else:
         env_value = os.environ.get(env_name)
+        if env_value is not None:
+            env_value = env_value.strip()
     if env_value not in (None, "") and (validator is None or validator(env_value)):
         return env_value
     value = config.get(name)

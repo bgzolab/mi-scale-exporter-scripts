@@ -55,6 +55,24 @@ class PollOpener:
         return PollResponse(next(self.bodies))
 
 
+class BrokenReadResponse:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self):
+        raise ConnectionResetError("connection reset while reading")
+
+
+class BrokenReadOpener:
+    handlers = []
+
+    def open(self, request, timeout=None):
+        return BrokenReadResponse()
+
+
 class AuthTest(unittest.TestCase):
     def test_parse_jsonp(self):
         payload = {"result": "ok", "userId": 123}
@@ -66,6 +84,10 @@ class AuthTest(unittest.TestCase):
     def test_parse_non_dict(self):
         with self.assertRaises(auth.LoginResponseError):
             auth.parse_login_json("[1, 2, 3]")
+
+    def test_open_json_wraps_read_error(self):
+        with self.assertRaises(auth.AuthError):
+            auth._open_json(BrokenReadOpener(), object(), 5)
 
     def test_login_with_pass_token(self):
         ssecurity = base64.b64encode(b"x" * 32).decode()

@@ -33,7 +33,11 @@ class ConfigTest(unittest.TestCase):
         args = SimpleNamespace(user_id=None, pass_token=None, region=None, model=None)
         with patch.dict(
             os.environ,
-            {"XIAOMI_ACCOUNT": "123", "MI_PASS_TOKEN": "V1:abc"},
+            {
+                "XIAOMI_ACCOUNT": "abc",
+                "MI_USER_ID": " 123 ",
+                "MI_PASS_TOKEN": " V1:abc ",
+            },
             clear=True,
         ):
             settings = resolve_connection_settings(args, {})
