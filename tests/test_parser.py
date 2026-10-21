@@ -97,6 +97,7 @@ class ParserTest(unittest.TestCase):
                     "bt": "4.0",
                     "pp": "16.3",
                     "height": "174",
+                    "userName": "Alice",
                     "user": {"name": "Alice", "deviceId": "blt.3.1abc"},
                 }
             ),
@@ -107,6 +108,8 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(measurement.heart_rate_bpm, None)
         self.assertEqual(measurement.source, "blt.3.1abc")
         self.assertEqual(measurement.extras["pp"], "16.3")
+        self.assertNotIn("height", measurement.extras)
+        self.assertNotIn("userName", measurement.extras)
 
     def test_source2_falls_back_to_did(self):
         import json

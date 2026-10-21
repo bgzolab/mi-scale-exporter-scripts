@@ -281,10 +281,9 @@ def poll_qr_login(
             data = parse_login_json(body) if body.strip() else {}
             if data.get("userId") and data.get("passToken"):
                 return _finish_login(opener, data, 0, "", 30.0, agent=challenge.agent)
-            if data.get("result") not in (None, "ok") and data.get("code") not in (None, 0):
+            if data.get("result") not in (None, "ok") or data.get("code") not in (None, 0):
                 message = data.get("description") or data.get("desc") or data.get("message")
-                if message:
-                    raise AuthError(f"二维码登录失败: {message}")
+                raise AuthError(f"二维码登录失败: {message or '未知错误'}")
         except LoginResponseError as exc:
             # A transient proxy/gateway HTML page should not abort a login the
             # user may already have confirmed on their phone.

@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from .auth import AuthResult, generate_agent
 from .crypto import decrypt_response, encrypt_request
+from .parser import MAX_TIMESTAMP_MS
 
 CN_BASE_URL = "https://api.io.mi.com/app"
 GLOBAL_BASE_URL = "https://{region}.api.io.mi.com/app"
@@ -42,9 +43,9 @@ def _timestamp_ms(value: Any) -> Optional[int]:
     number = _int_or_none(value)
     if number is None:
         return None
-    if number > 10**12:
+    if 10**12 < number <= MAX_TIMESTAMP_MS:
         return number
-    if number > 10**9:
+    if 10**9 < number <= MAX_TIMESTAMP_MS // 1000:
         return number * 1000
     return None
 
@@ -177,6 +178,7 @@ class XiaomiCloudClient:
             return []
         records: List[dict] = []
         seen = set()
+        range_active = since_ms is not None or until_ms is not None
 
         for page in range(max_pages):
             if self.region == "cn":
@@ -218,10 +220,20 @@ class XiaomiCloudClient:
                 if key in seen:
                     continue
                 seen.add(key)
-                records.append(item)
+
                 created = _timestamp_ms(item.get("createTime"))
                 if created is not None and (oldest is None or created < oldest):
                     oldest = created
+
+                if range_active:
+                    if created is None:
+                        continue
+                    if until_ms is not None and created > until_ms:
+                        continue
+                    if since_ms is not None and created < since_ms:
+                        continue
+
+                records.append(item)
 
             if limit is not None and len(records) >= limit:
                 records = records[:limit]

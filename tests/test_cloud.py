@@ -7,7 +7,7 @@ import urllib.parse
 from unittest.mock import patch
 
 from mi_scale_exporter.auth import AuthResult
-from mi_scale_exporter.cloud import CloudError, XiaomiCloudClient
+from mi_scale_exporter.cloud import CloudError, XiaomiCloudClient, _timestamp_ms
 from mi_scale_exporter.crypto import gen_signed_nonce, rc4_crypt
 
 
@@ -208,6 +208,23 @@ class CloudTest(unittest.TestCase):
             until_ms=base - 2000,
         )
         self.assertEqual([r["createTime"] for r in result], [base - 2000, base - 3000, base - 4000, base - 5000])
+
+    def test_timestamp_upper_bound(self):
+        self.assertIsNone(_timestamp_ms(10**15))
+        self.assertEqual(_timestamp_ms(1755927448000), 1755927448000)
+
+    def test_limit_counts_only_filtered_records(self):
+        base = 1755927448000
+        opener = FakeOpener([[item(i) for i in range(20)]])
+        auth = AuthResult(123, "token", SSECURITY, opener, "serviceToken=abc")
+        result = XiaomiCloudClient(auth).get_raw_records(
+            until_ms=base - 3000,
+            limit=5,
+        )
+        self.assertEqual(
+            [r["createTime"] for r in result],
+            [base - 3000, base - 4000, base - 5000, base - 6000, base - 7000],
+        )
 
     def test_missing_create_time_is_dropped_consistently(self):
         missing = item(0)

@@ -190,7 +190,7 @@ class AuthTest(unittest.TestCase):
         opener = PollOpener(
             [
                 json.dumps(
-                    {"result": "error", "code": 100, "description": "二维码已过期"}
+                    {"result": "error", "description": "二维码已过期"}
                 ).encode()
             ]
         )
