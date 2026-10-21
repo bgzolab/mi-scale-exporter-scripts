@@ -32,10 +32,10 @@ def _strip_quotes(value: str) -> str:
     return value
 
 
-def _first_entry(entries: Dict[str, str], names: tuple) -> Optional[str]:
+def _first_valid_entry(entries: Dict[str, str], names: tuple, validator) -> Optional[str]:
     for name in names:
         value = entries.get(name)
-        if value:
+        if value and validator(value):
             return value
     return None
 
@@ -81,15 +81,10 @@ def load_env_file(path: Optional[Path] = None) -> Dict[str, str]:
         else:
             raw_lines.append(_strip_quotes(line))
 
-    user_id = _first_entry(entries, ENV_FILE_USER_KEYS)
-    pass_token = _first_entry(entries, ENV_FILE_TOKEN_KEYS)
-
-    # Apply the same sanity checks to key/value aliases, otherwise an
-    # unrelated .env (ACCOUNT=..., USER_ID=...) could poison the process env.
-    if user_id is not None and not user_id.isdigit():
-        user_id = None
-    if pass_token is not None and not _looks_like_pass_token(pass_token):
-        pass_token = None
+    # Validate while iterating aliases, so a bad XIAOMI_* value can fall back
+    # to a valid ACCOUNT / USER_ID / PASS_TOKEN entry in the same file.
+    user_id = _first_valid_entry(entries, ENV_FILE_USER_KEYS, str.isdigit)
+    pass_token = _first_valid_entry(entries, ENV_FILE_TOKEN_KEYS, _looks_like_pass_token)
 
     # The user's .env may be just two raw lines: account, then pass token.
     # Require a numeric account and a plausible token so an unrelated .env

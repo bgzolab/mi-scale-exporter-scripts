@@ -95,7 +95,7 @@ class XiaomiCloudClient:
             headers={
                 "User-Agent": generate_agent(),
                 "Content-Type": "application/x-www-form-urlencoded",
-                "Cookie": self.auth.cookie_header_for("mi.com"),
+                "Cookie": self.auth.cookie_header_for("mi.com", target_path=path),
                 "MIOT-REQUEST-MODEL": self.model,
                 "Accept": "*/*",
             },

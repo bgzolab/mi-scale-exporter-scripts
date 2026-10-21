@@ -9,7 +9,7 @@ from unittest.mock import patch
 from mi_scale_exporter import auth
 
 
-def make_cookie(name, value, domain):
+def make_cookie(name, value, domain, path="/"):
     return Cookie(
         version=0,
         name=name,
@@ -19,7 +19,7 @@ def make_cookie(name, value, domain):
         domain=domain,
         domain_specified=True,
         domain_initial_dot=domain.startswith("."),
-        path="/",
+        path=path,
         path_specified=True,
         secure=False,
         expires=None,
@@ -125,12 +125,17 @@ class AuthTest(unittest.TestCase):
                 jar.set_cookie(make_cookie("passToken", "account-secret", ".account.xiaomi.com"))
                 jar.set_cookie(make_cookie("serviceToken", "service-secret", ".sts.api.io.mi.com"))
                 jar.set_cookie(make_cookie("userId", "123", ".sts.api.io.mi.com"))
+                jar.set_cookie(
+                    make_cookie("pathScoped", "app-only", ".sts.api.io.mi.com", path="/app")
+                )
                 break
 
-        scoped = auth._cookie_header(opener, "mi.com")
+        scoped = auth._cookie_header(opener, "mi.com", target_path="/eco/scale/getData")
         self.assertIn("serviceToken=service-secret", scoped)
         self.assertIn("userId=123", scoped)
         self.assertNotIn("account-secret", scoped)
+        self.assertNotIn("app-only", scoped)
+        self.assertIn("app-only", auth._cookie_header(opener, "mi.com", target_path="/app/eco"))
 
     def test_poll_qr_login_retries_on_bad_html(self):
         opener = PollOpener(
@@ -154,6 +159,18 @@ class AuthTest(unittest.TestCase):
         self.assertEqual(result, "finished")
         self.assertEqual(opener.calls, 2)
         finish.assert_called_once()
+
+    def test_poll_qr_login_timeout(self):
+        challenge = auth.QrChallenge(
+            login_url="https://example.invalid/login",
+            qr_url="https://example.invalid/qr",
+            poll_url="https://example.invalid/poll",
+            timeout=10,
+            agent="test-agent",
+        )
+        with self.assertRaises(auth.AuthError) as ctx:
+            auth.poll_qr_login(PollOpener([]), challenge, max_wait=0)
+        self.assertIn("超时", str(ctx.exception))
 
 
 if __name__ == "__main__":

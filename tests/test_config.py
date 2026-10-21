@@ -64,6 +64,18 @@ class ConfigTest(unittest.TestCase):
                 self.assertNotIn("XIAOMI_USER_ID", os.environ)
                 self.assertNotIn("XIAOMI_PASS_TOKEN", os.environ)
 
+    def test_env_bad_prefixed_value_falls_back_to_alias(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ".env"
+            path.write_text(
+                "XIAOMI_USER_ID=abc\nUSER_ID=123\nXIAOMI_PASS_TOKEN=too-short\nPASS_TOKEN=V1:valid\n",
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {}, clear=True):
+                values = load_env_file(path)
+                self.assertEqual(values["user_id"], "123")
+                self.assertEqual(values["pass_token"], "V1:valid")
+
     def test_env_does_not_override_environment(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / ".env"

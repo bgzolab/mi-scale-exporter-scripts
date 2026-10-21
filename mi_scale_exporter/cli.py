@@ -274,8 +274,10 @@ def command_export(args: argparse.Namespace) -> int:
         if args.debug:
             _info(f"[debug] cookies: {', '.join(auth.cookie_names())}")
         # Xiaomi may rotate the pass token during serviceLogin.  Update the
-        # local cache only when the credentials actually came from that cache.
-        if config.get("pass_token") and auth.pass_token != config.get("pass_token"):
+        # local cache only when this login actually used the cached account.
+        cached_user_id = config.get("user_id")
+        same_account = cached_user_id is not None and str(cached_user_id) == str(user_id)
+        if same_account and config.get("pass_token") and auth.pass_token != config.get("pass_token"):
             try:
                 config["pass_token"] = auth.pass_token
                 save_config(config, args.config or default_config_path())
@@ -346,10 +348,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         except ConfigError as exc:
             _error(str(exc))
             return 1
-    if args.command == "login":
-        return command_login(args)
-    if args.command == "export":
-        return command_export(args)
+    try:
+        if args.command == "login":
+            return command_login(args)
+        if args.command == "export":
+            return command_export(args)
+    except KeyboardInterrupt:
+        _info("已取消")
+        return 130
     parser.error("未知命令")
     return 2
 

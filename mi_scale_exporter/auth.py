@@ -108,6 +108,16 @@ def _domain_matches(domain: str, suffix: str) -> bool:
     return domain == suffix or domain.endswith("." + suffix)
 
 
+def _path_matches(request_path: str, cookie_path: str) -> bool:
+    """RFC 6265 path-match: /app matches /app and /app/..., not /apple."""
+    cookie_path = cookie_path or "/"
+    if request_path == cookie_path:
+        return True
+    if not request_path.startswith(cookie_path):
+        return False
+    return cookie_path.endswith("/") or request_path[len(cookie_path)] == "/"
+
+
 def _cookie_header(
     opener: urllib.request.OpenerDirector,
     domain_suffix: Optional[str] = None,
@@ -128,7 +138,7 @@ def _cookie_header(
         for cookie in jar:
             if domain_suffix and not _domain_matches(cookie.domain, domain_suffix):
                 continue
-            if target_path and not target_path.startswith(cookie.path or "/"):
+            if target_path and not _path_matches(target_path, cookie.path or "/"):
                 continue
             pairs[cookie.name] = cookie.value
     return "; ".join(f"{name}={value}" for name, value in pairs.items())
