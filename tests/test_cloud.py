@@ -226,6 +226,20 @@ class CloudTest(unittest.TestCase):
             [base - 3000, base - 4000, base - 5000, base - 6000, base - 7000],
         )
 
+    def test_since_limit_stops_at_limit(self):
+        base = 1755927448000
+        opener = FakeOpener([[item(i) for i in range(20)]])
+        auth = AuthResult(123, "token", SSECURITY, opener, "serviceToken=abc")
+        result = XiaomiCloudClient(auth).get_raw_records(
+            since_ms=base - 3000,
+            limit=2,
+        )
+        self.assertEqual(
+            [r["createTime"] for r in result],
+            [base, base - 1000],
+        )
+        self.assertEqual(len(opener.calls), 1)
+
     def test_missing_create_time_is_dropped_consistently(self):
         missing = item(0)
         missing.pop("createTime")
