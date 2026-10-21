@@ -63,6 +63,10 @@ class AuthTest(unittest.TestCase):
     def test_parse_empty(self):
         self.assertEqual(auth.parse_login_json(""), {})
 
+    def test_parse_non_dict(self):
+        with self.assertRaises(auth.LoginResponseError):
+            auth.parse_login_json("[1, 2, 3]")
+
     def test_login_with_pass_token(self):
         ssecurity = base64.b64encode(b"x" * 32).decode()
         state = {"port": 0}

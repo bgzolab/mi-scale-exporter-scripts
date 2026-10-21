@@ -237,23 +237,40 @@ class CliTest(unittest.TestCase):
                 )
         self.assertEqual(code, 2)
 
-    def test_invalid_pagination_arguments(self):
+    def test_login_rejects_invalid_env_user_id(self):
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.dict(os.environ, {"MI_SCALE_NO_ENV": "1"}):
+            with patch.dict(
+                os.environ,
+                {
+                    "MI_SCALE_NO_ENV": "1",
+                    "XIAOMI_ACCOUNT": "abc",
+                    "XIAOMI_PASS_TOKEN": "V1:abc",
+                },
+                clear=True,
+            ):
                 code = cli.main(
-                    [
-                        "export",
-                        "--user-id",
-                        "123",
-                        "--pass-token",
-                        "pt",
-                        "--config",
-                        str(Path(tmp) / "credentials.json"),
-                        "--max-pages",
-                        "0",
-                    ]
+                    ["login", "--config", str(Path(tmp) / "credentials.json")]
                 )
         self.assertEqual(code, 2)
+
+    def test_invalid_pagination_arguments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for flag in ("--max-pages", "--limit"):
+                with patch.dict(os.environ, {"MI_SCALE_NO_ENV": "1"}, clear=True):
+                    code = cli.main(
+                        [
+                            "export",
+                            "--user-id",
+                            "123",
+                            "--pass-token",
+                            "pt",
+                            "--config",
+                            str(Path(tmp) / "credentials.json"),
+                            flag,
+                            "0",
+                        ]
+                    )
+                self.assertEqual(code, 2)
 
 
 if __name__ == "__main__":

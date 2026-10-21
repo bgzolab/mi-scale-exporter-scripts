@@ -21,10 +21,10 @@ ENV_FILE_USER_KEYS = ENV_USER_KEYS + ("ACCOUNT", "USER_ID")
 ENV_FILE_TOKEN_KEYS = ENV_TOKEN_KEYS + ("PASS_TOKEN",)
 
 
-def get_env(names: tuple, default: Any = None) -> Any:
+def get_env(names: tuple, default: Any = None, validator=None) -> Any:
     for name in names:
         value = os.environ.get(name)
-        if value not in (None, ""):
+        if value not in (None, "") and (validator is None or validator(value)):
             return value
     return default
 
@@ -48,7 +48,7 @@ def _first_valid_entry(entries: Dict[str, str], names: tuple, validator) -> Opti
     return None
 
 
-def _looks_like_pass_token(value: str) -> bool:
+def looks_like_pass_token(value: str) -> bool:
     return value.startswith("V1:") or value.startswith("V2:") or len(value) >= 64
 
 
@@ -92,16 +92,16 @@ def load_env_file(path: Optional[Path] = None) -> Dict[str, str]:
     # Validate while iterating aliases, so a bad XIAOMI_* value can fall back
     # to a valid ACCOUNT / USER_ID / PASS_TOKEN entry in the same file.
     user_id = _first_valid_entry(entries, ENV_FILE_USER_KEYS, str.isdigit)
-    pass_token = _first_valid_entry(entries, ENV_FILE_TOKEN_KEYS, _looks_like_pass_token)
+    pass_token = _first_valid_entry(entries, ENV_FILE_TOKEN_KEYS, looks_like_pass_token)
 
     # The user's .env may be just two raw lines: account, then pass token.
     # Require a numeric account and a plausible token so an unrelated .env
     # cannot be mistaken for credentials.
     if user_id is None and pass_token is None and len(raw_lines) >= 2:
         first, second = raw_lines[0], raw_lines[1]
-        if first.isdigit() and _looks_like_pass_token(second):
+        if first.isdigit() and looks_like_pass_token(second):
             user_id, pass_token = first, second
-        elif second.isdigit() and _looks_like_pass_token(first):
+        elif second.isdigit() and looks_like_pass_token(first):
             user_id, pass_token = second, first
 
     if user_id:
@@ -164,15 +164,16 @@ def get_setting(
     config: Dict[str, Any],
     env_name: str,
     default: Any = None,
+    validator=None,
 ) -> Any:
     """Resolve CLI > environment > config > default."""
     if args_value not in (None, ""):
         return args_value
     if isinstance(env_name, (tuple, list)):
-        env_value = get_env(tuple(env_name))
+        env_value = get_env(tuple(env_name), validator=validator)
     else:
         env_value = os.environ.get(env_name)
-    if env_value not in (None, ""):
+    if env_value not in (None, "") and (validator is None or validator(env_value)):
         return env_value
     value = config.get(name)
     if value not in (None, ""):
@@ -181,9 +182,13 @@ def get_setting(
 
 
 def resolve_connection_settings(args: Any, config: Dict[str, Any]) -> Dict[str, Any]:
-    user_id = get_setting("user_id", getattr(args, "user_id", None), config, ENV_USER_KEYS)
+    user_id = get_setting(
+        "user_id", getattr(args, "user_id", None), config, ENV_USER_KEYS,
+        validator=str.isdigit,
+    )
     pass_token = get_setting(
-        "pass_token", getattr(args, "pass_token", None), config, ENV_TOKEN_KEYS
+        "pass_token", getattr(args, "pass_token", None), config, ENV_TOKEN_KEYS,
+        validator=looks_like_pass_token,
     )
     region = get_setting(
         "region", getattr(args, "region", None), config, "XIAOMI_REGION", DEFAULT_REGION
@@ -195,6 +200,8 @@ def resolve_connection_settings(args: Any, config: Dict[str, Any]) -> Dict[str, 
         user_id = user_id.strip()
     if isinstance(pass_token, str):
         pass_token = pass_token.strip()
+    if user_id not in (None, "") and not str(user_id).isdigit():
+        raise ValueError("userId 必须是数字")
     return {
         "user_id": int(user_id) if user_id not in (None, "") else None,
         "pass_token": str(pass_token) if pass_token not in (None, "") else None,

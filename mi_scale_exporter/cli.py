@@ -29,6 +29,7 @@ from .config import (
     ENV_TOKEN_KEYS,
     ENV_USER_KEYS,
     ConfigError,
+    looks_like_pass_token,
     default_config_path,
     get_env,
     get_setting,
@@ -207,12 +208,24 @@ def command_login(args: argparse.Namespace) -> int:
         _error(f"不支持的区域 {region!r}，可选: {', '.join(sorted(SUPPORTED_REGIONS))}")
         return 2
 
-    user_id = args.user_id or get_env(ENV_USER_KEYS)
-    pass_token = args.pass_token or get_env(ENV_TOKEN_KEYS)
+    env_user_id = None if args.user_id else get_env(ENV_USER_KEYS)
+    env_pass_token = None if args.pass_token else get_env(ENV_TOKEN_KEYS)
+    if env_user_id and not str(env_user_id).strip().isdigit():
+        _error(f"环境变量中的 userId 不是数字: {env_user_id!r}")
+        return 2
+    if env_pass_token and not looks_like_pass_token(str(env_pass_token).strip()):
+        _error("环境变量中的 passToken 格式不正确")
+        return 2
+
+    user_id = args.user_id or env_user_id
+    pass_token = args.pass_token or env_pass_token
     if isinstance(user_id, str):
         user_id = user_id.strip()
     if isinstance(pass_token, str):
         pass_token = pass_token.strip()
+    if user_id and not str(user_id).isdigit():
+        _error("--user-id 必须是数字")
+        return 2
 
     if bool(user_id) != bool(pass_token):
         _error("--user-id 和 --pass-token 必须同时提供")

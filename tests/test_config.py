@@ -41,6 +41,17 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings["pass_token"], "V1:abc")
         self.assertEqual(settings["region"], "cn")
 
+    def test_invalid_prefixed_env_aliases_are_ignored(self):
+        args = SimpleNamespace(user_id=None, pass_token=None, region=None, model=None)
+        with patch.dict(
+            os.environ,
+            {"XIAOMI_ACCOUNT": "abc", "MI_PASS_TOKEN": "short"},
+            clear=True,
+        ):
+            settings = resolve_connection_settings(args, {})
+        self.assertIsNone(settings["user_id"])
+        self.assertIsNone(settings["pass_token"])
+
     def test_env_key_value(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / ".env"

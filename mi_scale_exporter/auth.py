@@ -79,10 +79,15 @@ def parse_login_json(text: str) -> dict:
     if not text:
         return {}
     try:
-        return json.loads(text)
+        parsed = json.loads(text)
     except json.JSONDecodeError as exc:
         preview = text[:200].replace("\n", " ")
         raise LoginResponseError(f"小米账号返回了无法解析的响应: {preview!r}") from exc
+    if not isinstance(parsed, dict):
+        raise LoginResponseError(
+            f"小米账号返回了意外的响应结构: {type(parsed).__name__}"
+        )
+    return parsed
 
 
 def _build_opener() -> urllib.request.OpenerDirector:
