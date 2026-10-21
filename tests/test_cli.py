@@ -106,7 +106,13 @@ class CliTest(unittest.TestCase):
                     "ACCOUNT_SERVICE_LOGIN",
                     f"http://127.0.0.1:{server.server_port}/pass/serviceLogin?_json=true&sid=xiaomiio",
                 ), patch.object(cloud, "CN_BASE_URL", f"http://127.0.0.1:{server.server_port}/app"), patch.dict(
-                    os.environ, {"MI_SCALE_NO_ENV": "1"}
+                    os.environ,
+                    {
+                        "MI_SCALE_NO_ENV": "1",
+                        "XIAOMI_REGION": "",
+                        "XIAOMI_SCALE_MODEL": "",
+                    },
+                    clear=True,
                 ):
                     code = cli.main(
                         [

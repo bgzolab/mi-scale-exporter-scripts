@@ -347,12 +347,16 @@ def command_export(args: argparse.Namespace) -> int:
         return 1
 
     if args.raw:
-        handle, should_close = open_output(args.output, "json")
         try:
-            write_raw_json(handle, raw_records)
-        finally:
-            if should_close:
-                handle.close()
+            handle, should_close = open_output(args.output, "json")
+            try:
+                write_raw_json(handle, raw_records)
+            finally:
+                if should_close:
+                    handle.close()
+        except OSError as exc:
+            _error(f"写入输出失败: {exc}")
+            return 1
         _info(f"已导出 {len(raw_records)} 条原始记录 -> {args.output}")
         return 0
 
@@ -365,15 +369,19 @@ def command_export(args: argparse.Namespace) -> int:
     if not measurements:
         _info("没有找到可导出的测量记录。请确认型号是否正确、账号下是否有该体脂秤的数据。")
 
-    handle, should_close = open_output(args.output, fmt)
     try:
-        if fmt == "json":
-            write_json(handle, measurements, full=args.full, utc=args.utc)
-        else:
-            write_csv(handle, measurements, full=args.full, utc=args.utc)
-    finally:
-        if should_close:
-            handle.close()
+        handle, should_close = open_output(args.output, fmt)
+        try:
+            if fmt == "json":
+                write_json(handle, measurements, full=args.full, utc=args.utc)
+            else:
+                write_csv(handle, measurements, full=args.full, utc=args.utc)
+        finally:
+            if should_close:
+                handle.close()
+    except OSError as exc:
+        _error(f"写入输出失败: {exc}")
+        return 1
 
     _info(f"已导出 {len(measurements)} 条记录 -> {args.output}")
     if measurements:
