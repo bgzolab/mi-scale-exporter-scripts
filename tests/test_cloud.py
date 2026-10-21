@@ -23,11 +23,15 @@ class FakeResponse:
 
 
 class FakeOpener:
+    handlers = []
+
     def __init__(self, pages):
         self.pages = pages
         self.calls = []
+        self.urls = []
 
     def open(self, request, timeout=None):
+        self.urls.append(request.full_url)
         form = urllib.parse.parse_qs(request.data.decode())
         nonce = base64.b64decode(form["_nonce"][0])
         signed_nonce = gen_signed_nonce(SSECURITY, nonce)
@@ -128,6 +132,29 @@ class CloudTest(unittest.TestCase):
             until_ms=base - 2000,
         )
         self.assertEqual([r["createTime"] for r in result], [base - 2000, base - 3000, base - 4000, base - 5000])
+
+    def test_missing_create_time_is_dropped_consistently(self):
+        missing = item(0)
+        missing.pop("createTime")
+        valid = item(1)
+        auth = AuthResult(123, "token", SSECURITY, FakeOpener([[missing, valid]]), "serviceToken=abc")
+        since = XiaomiCloudClient(auth).get_raw_records(since_ms=1755927440000)
+        self.assertEqual([r["createTime"] for r in since], [1755927447000])
+
+        auth = AuthResult(123, "token", SSECURITY, FakeOpener([[missing, valid]]), "serviceToken=abc")
+        until = XiaomiCloudClient(auth).get_raw_records(until_ms=1755927448000)
+        self.assertEqual([r["createTime"] for r in until], [1755927447000])
+
+    def test_global_region_params(self):
+        opener = FakeOpener([[item(0)]])
+        auth = AuthResult(123, "token", SSECURITY, opener, "serviceToken=abc")
+        records = XiaomiCloudClient(auth, region="us").get_raw_records(limit=1)
+        self.assertEqual(len(records), 1)
+        params = opener.calls[0]
+        self.assertEqual(params["uid"], "123")
+        self.assertEqual(params["accountId"], 0)
+        self.assertNotIn("param", params)
+        self.assertIn("/eco/common/scale/getUserDataByPage", opener.urls[0])
 
 
 if __name__ == "__main__":

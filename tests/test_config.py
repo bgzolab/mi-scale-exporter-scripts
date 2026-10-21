@@ -54,18 +54,28 @@ class ConfigTest(unittest.TestCase):
                 self.assertNotIn("XIAOMI_USER_ID", os.environ)
                 self.assertNotIn("XIAOMI_PASS_TOKEN", os.environ)
 
+    def test_env_key_value_aliases_are_validated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ".env"
+            path.write_text("ACCOUNT=not-a-number\nPASS_TOKEN=too-short\n", encoding="utf-8")
+            with patch.dict(os.environ, {}, clear=True):
+                values = load_env_file(path)
+                self.assertEqual(values, {"user_id": "", "pass_token": ""})
+                self.assertNotIn("XIAOMI_USER_ID", os.environ)
+                self.assertNotIn("XIAOMI_PASS_TOKEN", os.environ)
+
     def test_env_does_not_override_environment(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / ".env"
-            path.write_text("XIAOMI_USER_ID=123\nXIAOMI_PASS_TOKEN=from-file\n", encoding="utf-8")
+            path.write_text("XIAOMI_USER_ID=123\nXIAOMI_PASS_TOKEN=V1:from-file\n", encoding="utf-8")
             with patch.dict(
                 os.environ,
-                {"XIAOMI_USER_ID": "999", "XIAOMI_PASS_TOKEN": "from-env"},
+                {"XIAOMI_USER_ID": "999", "XIAOMI_PASS_TOKEN": "V1:from-env"},
                 clear=True,
             ):
                 load_env_file(path)
                 self.assertEqual(os.environ["XIAOMI_USER_ID"], "999")
-                self.assertEqual(os.environ["XIAOMI_PASS_TOKEN"], "from-env")
+                self.assertEqual(os.environ["XIAOMI_PASS_TOKEN"], "V1:from-env")
 
 
 if __name__ == "__main__":

@@ -34,6 +34,10 @@ class AuthError(RuntimeError):
     """Raised when Xiaomi rejects or cannot complete a login."""
 
 
+class LoginResponseError(AuthError):
+    """Raised when an account endpoint returns a non-JSON transient response."""
+
+
 @dataclass
 class AuthResult:
     user_id: int
@@ -41,6 +45,10 @@ class AuthResult:
     ssecurity: bytes
     opener: urllib.request.OpenerDirector
     cookie_header: str
+
+    def cookie_header_for(self, domain_suffix: str = "mi.com", target_path: str = "/") -> str:
+        """Return a Cookie header scoped to the Xiaomi app API hosts."""
+        return _cookie_header(self.opener, domain_suffix=domain_suffix, target_path=target_path)
 
     def cookie_names(self) -> list[str]:
         """Cookie names only, useful for debugging without leaking values."""
@@ -74,7 +82,7 @@ def parse_login_json(text: str) -> dict:
         return json.loads(text)
     except json.JSONDecodeError as exc:
         preview = text[:200].replace("\n", " ")
-        raise AuthError(f"小米账号返回了无法解析的响应: {preview!r}") from exc
+        raise LoginResponseError(f"小米账号返回了无法解析的响应: {preview!r}") from exc
 
 
 def _build_opener() -> urllib.request.OpenerDirector:
@@ -94,14 +102,34 @@ def _open_json(opener: urllib.request.OpenerDirector, request: urllib.request.Re
     return parse_login_json(body)
 
 
-def _cookie_header(opener: urllib.request.OpenerDirector) -> str:
-    """Return all cookies currently held by the opener as a Cookie header."""
+def _domain_matches(domain: str, suffix: str) -> bool:
+    domain = domain.lstrip(".").lower()
+    suffix = suffix.lstrip(".").lower()
+    return domain == suffix or domain.endswith("." + suffix)
+
+
+def _cookie_header(
+    opener: urllib.request.OpenerDirector,
+    domain_suffix: Optional[str] = None,
+    target_path: str = "/",
+) -> str:
+    """Return cookies as a Cookie header, optionally scoped by domain/path.
+
+    Xiaomi stores the service cookies on ``.sts.api.io.mi.com`` while the app
+    API lives on ``api.io.mi.com``.  Both are under ``mi.com``; the account
+    cookies on ``account.xiaomi.com`` / ``.xiaomi.com`` do not need to be sent
+    to the API.
+    """
     pairs: dict[str, str] = {}
     for handler in opener.handlers:
         jar = getattr(handler, "cookiejar", None)
         if jar is None:
             continue
         for cookie in jar:
+            if domain_suffix and not _domain_matches(cookie.domain, domain_suffix):
+                continue
+            if target_path and not target_path.startswith(cookie.path or "/"):
+                continue
             pairs[cookie.name] = cookie.value
     return "; ".join(f"{name}={value}" for name, value in pairs.items())
 
@@ -242,6 +270,10 @@ def poll_qr_login(
                 message = data.get("description") or data.get("desc") or data.get("message")
                 if message:
                     raise AuthError(f"二维码登录失败: {message}")
+        except LoginResponseError as exc:
+            # A transient proxy/gateway HTML page should not abort a login the
+            # user may already have confirmed on their phone.
+            last_error = exc
         except AuthError:
             raise
         except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:

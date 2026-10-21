@@ -99,7 +99,9 @@ XIAOMI_PASS_TOKEN=V1:....
 V1:....
 ```
 
-`.env` 已被 `.gitignore` 忽略，不会误提交。
+`.env` 已被 `.gitignore` 忽略，不会误提交。也支持 `ACCOUNT` / `USER_ID` / `PASS_TOKEN` 这些文件内别名（会校验格式）。如果不想自动读取 `.env`，设置 `MI_SCALE_NO_ENV=1`。
+
+> 在共享主机或 CI 上，尽量不要通过 `--pass-token` 命令行参数传凭证（会进入 shell history / 进程列表）；优先使用 `.env`、环境变量或凭证文件。
 
 凭证默认保存到：
 

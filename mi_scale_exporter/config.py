@@ -84,6 +84,13 @@ def load_env_file(path: Optional[Path] = None) -> Dict[str, str]:
     user_id = _first_entry(entries, ENV_FILE_USER_KEYS)
     pass_token = _first_entry(entries, ENV_FILE_TOKEN_KEYS)
 
+    # Apply the same sanity checks to key/value aliases, otherwise an
+    # unrelated .env (ACCOUNT=..., USER_ID=...) could poison the process env.
+    if user_id is not None and not user_id.isdigit():
+        user_id = None
+    if pass_token is not None and not _looks_like_pass_token(pass_token):
+        pass_token = None
+
     # The user's .env may be just two raw lines: account, then pass token.
     # Require a numeric account and a plausible token so an unrelated .env
     # cannot be mistaken for credentials.

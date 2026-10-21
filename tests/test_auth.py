@@ -2,10 +2,57 @@ import base64
 import json
 import threading
 import unittest
+from http.cookiejar import Cookie
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest.mock import patch
 
 from mi_scale_exporter import auth
+
+
+def make_cookie(name, value, domain):
+    return Cookie(
+        version=0,
+        name=name,
+        value=value,
+        port=None,
+        port_specified=False,
+        domain=domain,
+        domain_specified=True,
+        domain_initial_dot=domain.startswith("."),
+        path="/",
+        path_specified=True,
+        secure=False,
+        expires=None,
+        discard=True,
+        comment=None,
+        comment_url=None,
+        rest={},
+        rfc2109=False,
+    )
+
+
+class PollResponse:
+    def __init__(self, body):
+        self.body = body
+
+    def read(self):
+        return self.body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class PollOpener:
+    def __init__(self, bodies):
+        self.bodies = iter(bodies)
+        self.calls = 0
+
+    def open(self, request, timeout=None):
+        self.calls += 1
+        return PollResponse(next(self.bodies))
 
 
 class AuthTest(unittest.TestCase):
@@ -69,6 +116,44 @@ class AuthTest(unittest.TestCase):
         self.assertEqual(result.pass_token, "pt")
         self.assertIn("serviceToken=abc", result.cookie_header)
         self.assertEqual(result.ssecurity, b"x" * 32)
+
+    def test_cookie_header_is_scoped_to_mi_domains(self):
+        opener = auth._build_opener()
+        for handler in opener.handlers:
+            jar = getattr(handler, "cookiejar", None)
+            if jar is not None:
+                jar.set_cookie(make_cookie("passToken", "account-secret", ".account.xiaomi.com"))
+                jar.set_cookie(make_cookie("serviceToken", "service-secret", ".sts.api.io.mi.com"))
+                jar.set_cookie(make_cookie("userId", "123", ".sts.api.io.mi.com"))
+                break
+
+        scoped = auth._cookie_header(opener, "mi.com")
+        self.assertIn("serviceToken=service-secret", scoped)
+        self.assertIn("userId=123", scoped)
+        self.assertNotIn("account-secret", scoped)
+
+    def test_poll_qr_login_retries_on_bad_html(self):
+        opener = PollOpener(
+            [
+                b"<html>bad gateway</html>",
+                json.dumps({"userId": 123, "passToken": "pt"}).encode(),
+            ]
+        )
+        challenge = auth.QrChallenge(
+            login_url="https://example.invalid/login",
+            qr_url="https://example.invalid/qr",
+            poll_url="https://example.invalid/poll",
+            timeout=10,
+            agent="test-agent",
+        )
+        with patch.object(auth, "_finish_login", return_value="finished") as finish, patch.object(
+            auth.time, "sleep", return_value=None
+        ):
+            result = auth.poll_qr_login(opener, challenge, max_wait=10)
+
+        self.assertEqual(result, "finished")
+        self.assertEqual(opener.calls, 2)
+        finish.assert_called_once()
 
 
 if __name__ == "__main__":

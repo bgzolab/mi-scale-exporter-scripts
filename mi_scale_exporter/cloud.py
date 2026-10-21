@@ -95,7 +95,7 @@ class XiaomiCloudClient:
             headers={
                 "User-Agent": generate_agent(),
                 "Content-Type": "application/x-www-form-urlencoded",
-                "Cookie": self.auth.cookie_header,
+                "Cookie": self.auth.cookie_header_for("mi.com"),
                 "MIOT-REQUEST-MODEL": self.model,
                 "Accept": "*/*",
             },
@@ -214,16 +214,26 @@ class XiaomiCloudClient:
                 break
             ts = next_ts
 
+        if since_ms is not None or until_ms is not None:
+            before = len(records)
+            records = [
+                item for item in records if _timestamp_ms(item.get("createTime")) is not None
+            ]
+            dropped = before - len(records)
+            if dropped:
+                self._debug_log(f"过滤掉 {dropped} 条没有有效 createTime 的记录")
         if until_ms is not None:
             records = [
                 item
                 for item in records
-                if (_timestamp_ms(item.get("createTime")) or 0) <= until_ms
+                if (created := _timestamp_ms(item.get("createTime"))) is not None
+                and created <= until_ms
             ]
         if since_ms is not None:
             records = [
                 item
                 for item in records
-                if (_timestamp_ms(item.get("createTime")) or 0) >= since_ms
+                if (created := _timestamp_ms(item.get("createTime"))) is not None
+                and created >= since_ms
             ]
         return records
