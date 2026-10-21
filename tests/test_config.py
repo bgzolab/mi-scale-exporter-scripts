@@ -2,9 +2,15 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from mi_scale_exporter.config import load_config, load_env_file, save_config
+from mi_scale_exporter.config import (
+    load_config,
+    load_env_file,
+    resolve_connection_settings,
+    save_config,
+)
 
 
 class ConfigTest(unittest.TestCase):
@@ -22,6 +28,18 @@ class ConfigTest(unittest.TestCase):
     def test_missing_is_empty(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(load_config(Path(tmp) / "missing.json"), {})
+
+    def test_prefixed_env_aliases(self):
+        args = SimpleNamespace(user_id=None, pass_token=None, region=None, model=None)
+        with patch.dict(
+            os.environ,
+            {"XIAOMI_ACCOUNT": "123", "MI_PASS_TOKEN": "V1:abc"},
+            clear=True,
+        ):
+            settings = resolve_connection_settings(args, {})
+        self.assertEqual(settings["user_id"], 123)
+        self.assertEqual(settings["pass_token"], "V1:abc")
+        self.assertEqual(settings["region"], "cn")
 
     def test_env_key_value(self):
         with tempfile.TemporaryDirectory() as tmp:

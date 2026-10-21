@@ -174,6 +174,7 @@ class CliTest(unittest.TestCase):
                         "XIAOMI_REGION": "us",
                         "XIAOMI_SCALE_MODEL": "xiaomi.scales.ms113",
                     },
+                    clear=True,
                 ):
                     code = cli.main(
                         [
@@ -213,6 +214,28 @@ class CliTest(unittest.TestCase):
             server.shutdown()
             server.server_close()
             thread.join(timeout=5)
+
+    def test_login_rejects_invalid_region(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(
+                os.environ,
+                {
+                    "MI_SCALE_NO_ENV": "1",
+                    "XIAOMI_REGION": "xx",
+                    "XIAOMI_PASS_TOKEN": "V1:abc",
+                },
+                clear=True,
+            ):
+                code = cli.main(
+                    [
+                        "login",
+                        "--user-id",
+                        "123",
+                        "--config",
+                        str(Path(tmp) / "credentials.json"),
+                    ]
+                )
+        self.assertEqual(code, 2)
 
     def test_invalid_pagination_arguments(self):
         with tempfile.TemporaryDirectory() as tmp:

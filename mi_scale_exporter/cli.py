@@ -18,10 +18,19 @@ from .auth import (
     poll_qr_login,
     start_qr_login,
 )
-from .cloud import DEFAULT_MODEL, DEFAULT_REGION, CloudError, XiaomiCloudClient
+from .cloud import (
+    DEFAULT_MODEL,
+    DEFAULT_REGION,
+    SUPPORTED_REGIONS,
+    CloudError,
+    XiaomiCloudClient,
+)
 from .config import (
+    ENV_TOKEN_KEYS,
+    ENV_USER_KEYS,
     ConfigError,
     default_config_path,
+    get_env,
     get_setting,
     load_config,
     load_env_file,
@@ -194,9 +203,12 @@ def command_login(args: argparse.Namespace) -> int:
     model = str(
         get_setting("model", args.model, config, "XIAOMI_SCALE_MODEL", DEFAULT_MODEL)
     ).strip()
+    if region not in SUPPORTED_REGIONS:
+        _error(f"不支持的区域 {region!r}，可选: {', '.join(sorted(SUPPORTED_REGIONS))}")
+        return 2
 
-    user_id = args.user_id or os.environ.get("XIAOMI_USER_ID")
-    pass_token = args.pass_token or os.environ.get("XIAOMI_PASS_TOKEN")
+    user_id = args.user_id or get_env(ENV_USER_KEYS)
+    pass_token = args.pass_token or get_env(ENV_TOKEN_KEYS)
     if isinstance(user_id, str):
         user_id = user_id.strip()
     if isinstance(pass_token, str):

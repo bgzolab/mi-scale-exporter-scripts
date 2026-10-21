@@ -21,6 +21,14 @@ ENV_FILE_USER_KEYS = ENV_USER_KEYS + ("ACCOUNT", "USER_ID")
 ENV_FILE_TOKEN_KEYS = ENV_TOKEN_KEYS + ("PASS_TOKEN",)
 
 
+def get_env(names: tuple, default: Any = None) -> Any:
+    for name in names:
+        value = os.environ.get(name)
+        if value not in (None, ""):
+            return value
+    return default
+
+
 class ConfigError(RuntimeError):
     pass
 
@@ -160,7 +168,10 @@ def get_setting(
     """Resolve CLI > environment > config > default."""
     if args_value not in (None, ""):
         return args_value
-    env_value = os.environ.get(env_name)
+    if isinstance(env_name, (tuple, list)):
+        env_value = get_env(tuple(env_name))
+    else:
+        env_value = os.environ.get(env_name)
     if env_value not in (None, ""):
         return env_value
     value = config.get(name)
@@ -170,9 +181,9 @@ def get_setting(
 
 
 def resolve_connection_settings(args: Any, config: Dict[str, Any]) -> Dict[str, Any]:
-    user_id = get_setting("user_id", getattr(args, "user_id", None), config, "XIAOMI_USER_ID")
+    user_id = get_setting("user_id", getattr(args, "user_id", None), config, ENV_USER_KEYS)
     pass_token = get_setting(
-        "pass_token", getattr(args, "pass_token", None), config, "XIAOMI_PASS_TOKEN"
+        "pass_token", getattr(args, "pass_token", None), config, ENV_TOKEN_KEYS
     )
     region = get_setting(
         "region", getattr(args, "region", None), config, "XIAOMI_REGION", DEFAULT_REGION
