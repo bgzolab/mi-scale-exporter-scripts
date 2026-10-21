@@ -174,6 +174,12 @@ class ParserTest(unittest.TestCase):
     def test_skips_non_weight_records(self):
         self.assertIsNone(parse_record({"createTime": 1700000000000, "data": "{}"}))
 
+    def test_skips_out_of_range_timestamp(self):
+        item = s800_item()
+        item["createTime"] = 999999999999999999999
+        item["data"] = item["data"].replace(str(1755927448000), "999999999999999999999")
+        self.assertIsNone(parse_record(item))
+
     def test_dedupe_keeps_richest(self):
         poor = s800_item(body_fat="")
         rich = s800_item(body_fat="16.5")

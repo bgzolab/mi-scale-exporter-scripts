@@ -191,6 +191,9 @@ def _as_int(value: Any) -> Optional[int]:
     return int(number) if number is not None else None
 
 
+MAX_TIMESTAMP_MS = 32_503_680_000_000  # 3000-01-01, avoids platform overflow
+
+
 def _as_ms(value: Any) -> Optional[int]:
     if value is None or isinstance(value, bool):
         return None
@@ -204,9 +207,9 @@ def _as_ms(value: Any) -> Optional[int]:
             number = int(float(text))
         except ValueError:
             return None
-    if number > 10**12:
+    if 10**12 < number <= MAX_TIMESTAMP_MS:
         return number
-    if number > 10**9:
+    if 10**9 < number <= MAX_TIMESTAMP_MS // 1000:
         return number * 1000
     return None
 

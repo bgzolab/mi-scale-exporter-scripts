@@ -109,7 +109,7 @@ def _add_connection_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--pass-token", help="小米账号 passToken（也可用 XIAOMI_PASS_TOKEN）")
     parser.add_argument(
         "--region",
-        choices=["cn", "de", "i2", "ru", "sg", "us"],
+        choices=sorted(SUPPORTED_REGIONS),
         help=f"账号区域，默认 {DEFAULT_REGION}",
     )
     parser.add_argument(
@@ -131,9 +131,14 @@ def _error(message: str) -> None:
     print(f"错误: {message}", file=sys.stderr)
 
 
-def _warn_json_suffix(fmt: str, output: Optional[str]) -> None:
-    if fmt == "json" and output not in (None, "-") and not output.lower().endswith(".json"):
+def _warn_extension_mismatch(fmt: str, output: Optional[str]) -> None:
+    if output in (None, "-"):
+        return
+    lower = output.lower()
+    if fmt == "json" and not lower.endswith(".json"):
         _info("提示: 输出格式为 JSON，当前文件名不是 .json 后缀")
+    elif fmt == "csv" and lower.endswith(".json"):
+        _info("提示: 输出格式为 CSV，当前文件名却是 .json 后缀")
 
 
 def _print_qr(login_url: str, qr_url: str) -> None:
@@ -305,7 +310,7 @@ def command_export(args: argparse.Namespace) -> int:
             _info("提示: --raw 会忽略 --format csv，实际输出 JSON")
     else:
         fmt = output_format(args.output, "json" if args.json else args.format)
-    _warn_json_suffix(fmt, args.output)
+    _warn_extension_mismatch(fmt, args.output)
 
     try:
         _info("正在登录小米云...")

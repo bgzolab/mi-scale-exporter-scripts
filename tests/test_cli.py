@@ -99,6 +99,7 @@ class CliTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 output = Path(tmp) / "weights.csv"
                 json_output = Path(tmp) / "weights.json"
+                raw_output = Path(tmp) / "raw.json"
                 config = Path(tmp) / "credentials.json"
                 with patch.object(
                     auth,
@@ -136,8 +137,23 @@ class CliTest(unittest.TestCase):
                             str(json_output),
                         ]
                     )
+                    code_raw = cli.main(
+                        [
+                            "export",
+                            "--user-id",
+                            "123",
+                            "--pass-token",
+                            "pt",
+                            "--config",
+                            str(config),
+                            "--raw",
+                            "-o",
+                            str(raw_output),
+                        ]
+                    )
                 self.assertEqual(code, 0)
                 self.assertEqual(code_json, 0)
+                self.assertEqual(code_raw, 0)
                 text = output.read_text(encoding="utf-8-sig")
                 self.assertIn("weight_kg", text)
                 self.assertIn("63.15", text)
@@ -150,6 +166,10 @@ class CliTest(unittest.TestCase):
                 self.assertEqual(data[-1]["weight_kg"], 63.15)
                 self.assertEqual(data[-1]["extras"]["ram"], "2.7")
                 self.assertIn("bodyResData", data[-1]["raw"])
+                raw = json.loads(raw_output.read_text(encoding="utf-8"))
+                self.assertIsInstance(raw, list)
+                self.assertEqual(len(raw), 2)
+                self.assertIn("createTime", raw[0])
         finally:
             server.shutdown()
             server.server_close()

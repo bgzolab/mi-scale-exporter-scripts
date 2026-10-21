@@ -4,12 +4,25 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import sys
 from datetime import date, datetime, time
 from pathlib import Path
 from typing import Iterable, List, Optional, TextIO
 
 from .parser import EXTRA_COLUMNS, MAIN_COLUMNS, Measurement
+
+
+def _normalize_fractional_seconds(text: str) -> str:
+    """Make fractional seconds 3 or 6 digits for Python 3.9/3.10."""
+    match = re.match(r"^(.*\.)(\d+)(.*)$", text)
+    if not match:
+        return text
+    fraction = match.group(2)
+    if len(fraction) in (3, 6):
+        return text
+    fraction = (fraction + "000000")[:6]
+    return match.group(1) + fraction + match.group(3)
 
 
 def parse_time(value: str, end_of_day: bool = False) -> datetime:
@@ -22,7 +35,14 @@ def parse_time(value: str, end_of_day: bool = False) -> datetime:
             day = date.fromisoformat(text)
             parsed = datetime.combine(day, time.max if end_of_day else time.min)
         else:
-            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            iso = text.replace("Z", "+00:00")
+            try:
+                parsed = datetime.fromisoformat(iso)
+            except ValueError:
+                normalized = _normalize_fractional_seconds(iso)
+                if normalized == iso:
+                    raise
+                parsed = datetime.fromisoformat(normalized)
     except ValueError as exc:
         raise ValueError(f"无法解析时间 {value!r}，请使用 YYYY-MM-DD 或 ISO-8601") from exc
 
