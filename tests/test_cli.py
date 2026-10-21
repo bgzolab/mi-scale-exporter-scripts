@@ -115,6 +115,7 @@ class CliTest(unittest.TestCase):
                             "pt",
                             "--config",
                             str(config),
+                            "--full",
                             "-o",
                             str(output),
                         ]
@@ -125,6 +126,8 @@ class CliTest(unittest.TestCase):
                 self.assertIn("63.15", text)
                 self.assertIn("Alice", text)
                 self.assertIn("16.5", text)
+                self.assertIn("right_arm_muscle_kg", text)
+                self.assertIn("2.7", text)
         finally:
             server.shutdown()
             server.server_close()

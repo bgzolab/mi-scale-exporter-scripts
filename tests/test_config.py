@@ -17,6 +17,7 @@ class ConfigTest(unittest.TestCase):
             self.assertEqual(load_config(path)["pass_token"], "secret")
             if os.name != "nt":
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+                self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
 
     def test_missing_is_empty(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -42,6 +43,16 @@ class ConfigTest(unittest.TestCase):
                 self.assertEqual(values["user_id"], "123456789")
                 self.assertTrue(values["pass_token"].startswith("V1:"))
                 self.assertEqual(os.environ["XIAOMI_USER_ID"], "123456789")
+
+    def test_env_plain_text_is_not_credentials(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ".env"
+            path.write_text("some note\nanother note\n", encoding="utf-8")
+            with patch.dict(os.environ, {}, clear=True):
+                values = load_env_file(path)
+                self.assertEqual(values, {"user_id": "", "pass_token": ""})
+                self.assertNotIn("XIAOMI_USER_ID", os.environ)
+                self.assertNotIn("XIAOMI_PASS_TOKEN", os.environ)
 
     def test_env_does_not_override_environment(self):
         with tempfile.TemporaryDirectory() as tmp:

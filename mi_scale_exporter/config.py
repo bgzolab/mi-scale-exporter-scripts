@@ -12,8 +12,13 @@ from typing import Any, Dict, Optional
 
 from .cloud import DEFAULT_MODEL, DEFAULT_REGION
 
-ENV_USER_KEYS = ("XIAOMI_USER_ID", "XIAOMI_ACCOUNT", "ACCOUNT", "USER_ID", "MI_USER_ID")
-ENV_TOKEN_KEYS = ("XIAOMI_PASS_TOKEN", "PASS_TOKEN", "MI_PASS_TOKEN")
+# Process environment only accepts prefixed names to avoid clashing with
+# unrelated CI / container variables such as ACCOUNT or USER_ID.
+ENV_USER_KEYS = ("XIAOMI_USER_ID", "XIAOMI_ACCOUNT", "MI_USER_ID")
+ENV_TOKEN_KEYS = ("XIAOMI_PASS_TOKEN", "MI_PASS_TOKEN")
+# The .env file is project-local, so the shorter aliases are safe there.
+ENV_FILE_USER_KEYS = ENV_USER_KEYS + ("ACCOUNT", "USER_ID")
+ENV_FILE_TOKEN_KEYS = ENV_TOKEN_KEYS + ("PASS_TOKEN",)
 
 
 class ConfigError(RuntimeError):
@@ -33,6 +38,10 @@ def _first_entry(entries: Dict[str, str], names: tuple) -> Optional[str]:
         if value:
             return value
     return None
+
+
+def _looks_like_pass_token(value: str) -> bool:
+    return value.startswith("V1:") or value.startswith("V2:") or len(value) >= 64
 
 
 def load_env_file(path: Optional[Path] = None) -> Dict[str, str]:
@@ -72,18 +81,18 @@ def load_env_file(path: Optional[Path] = None) -> Dict[str, str]:
         else:
             raw_lines.append(_strip_quotes(line))
 
-    user_id = _first_entry(entries, ENV_USER_KEYS)
-    pass_token = _first_entry(entries, ENV_TOKEN_KEYS)
+    user_id = _first_entry(entries, ENV_FILE_USER_KEYS)
+    pass_token = _first_entry(entries, ENV_FILE_TOKEN_KEYS)
 
     # The user's .env may be just two raw lines: account, then pass token.
+    # Require a numeric account and a plausible token so an unrelated .env
+    # cannot be mistaken for credentials.
     if user_id is None and pass_token is None and len(raw_lines) >= 2:
         first, second = raw_lines[0], raw_lines[1]
-        if first.isdigit():
+        if first.isdigit() and _looks_like_pass_token(second):
             user_id, pass_token = first, second
-        elif second.isdigit():
+        elif second.isdigit() and _looks_like_pass_token(first):
             user_id, pass_token = second, first
-        else:
-            user_id, pass_token = first, second
 
     if user_id:
         os.environ.setdefault("XIAOMI_USER_ID", user_id)
@@ -116,7 +125,13 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
 
 def save_config(data: Dict[str, Any], path: Optional[Path] = None) -> Path:
     path = path or default_config_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
+    created_dir = not path.parent.exists()
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if os.name != "nt" and (created_dir or path.parent == default_config_path().parent):
+        try:
+            os.chmod(path.parent, 0o700)
+        except OSError:
+            pass
     payload = dict(data)
     payload["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
 

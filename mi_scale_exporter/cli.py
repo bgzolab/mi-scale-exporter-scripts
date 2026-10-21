@@ -261,14 +261,27 @@ def command_export(args: argparse.Namespace) -> int:
 
     if args.raw:
         fmt = "json"
+        if args.output not in (None, "-") and not args.output.lower().endswith(".json"):
+            _info("提示: --raw 输出格式固定为 JSON，当前文件名不是 .json 后缀")
+        if args.format == "csv":
+            _info("提示: --raw 会忽略 --format csv，实际输出 JSON")
     else:
-        fmt = output_format(args.output, "json" if args.json else args.format, raw=False)
+        fmt = output_format(args.output, "json" if args.json else args.format)
 
     try:
         _info("正在登录小米云...")
         auth = login_with_pass_token(user_id, pass_token, timeout=args.timeout)
         if args.debug:
             _info(f"[debug] cookies: {', '.join(auth.cookie_names())}")
+        # Xiaomi may rotate the pass token during serviceLogin.  Update the
+        # local cache only when the credentials actually came from that cache.
+        if config.get("pass_token") and auth.pass_token != config.get("pass_token"):
+            try:
+                config["pass_token"] = auth.pass_token
+                save_config(config, args.config or default_config_path())
+                _info("已更新本地 passToken 缓存")
+            except (ConfigError, OSError) as exc:
+                _info(f"警告: 无法更新 passToken 缓存: {exc}")
         client = XiaomiCloudClient(
             auth,
             region=region,

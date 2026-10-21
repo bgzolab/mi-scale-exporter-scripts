@@ -61,11 +61,9 @@ def write_raw_json(handle: TextIO, records: Iterable[dict]) -> None:
     handle.write("\n")
 
 
-def output_format(path: Optional[str], requested: Optional[str], raw: bool = False) -> str:
+def output_format(path: Optional[str], requested: Optional[str] = None) -> str:
     if requested:
         return requested
-    if raw:
-        return "json"
     if path and path.lower().endswith(".json"):
         return "json"
     return "csv"

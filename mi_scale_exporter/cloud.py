@@ -47,6 +47,13 @@ def _timestamp_ms(value: Any) -> Optional[int]:
     return None
 
 
+def _hashable(value: Any) -> Any:
+    """Make nested JSON values usable in a set/dict key."""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return value
+
+
 class XiaomiCloudClient:
     def __init__(
         self,
@@ -180,7 +187,7 @@ class XiaomiCloudClient:
                     item.get("createTime"),
                     item.get("did"),
                     item.get("fromSource"),
-                    item.get("data"),
+                    _hashable(item.get("data")),
                 )
                 if key in seen:
                     continue
@@ -200,7 +207,8 @@ class XiaomiCloudClient:
             if len(result) < 20:
                 break
 
-            next_ts = _timestamp_ms(result[19].get("createTime"))
+            last_item = result[19]
+            next_ts = _timestamp_ms(last_item.get("createTime")) if isinstance(last_item, dict) else None
             if next_ts is None or next_ts <= 0 or next_ts >= ts:
                 self._debug_log("分页时间戳没有前进，停止以避免死循环")
                 break
