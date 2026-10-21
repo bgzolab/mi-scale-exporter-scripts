@@ -1,7 +1,9 @@
 import base64
 import json
 import unittest
+import urllib.error
 import urllib.parse
+from unittest.mock import patch
 
 from mi_scale_exporter.auth import AuthResult
 from mi_scale_exporter.cloud import CloudError, XiaomiCloudClient
@@ -51,6 +53,18 @@ class FakeErrorOpener(FakeOpener):
         payload = json.dumps({"code": 100, "message": "bad request"}).encode()
         encrypted = base64.b64encode(rc4_crypt(signed_nonce, payload))
         return FakeResponse(encrypted)
+
+
+class FlakyOpener(FakeOpener):
+    def __init__(self, pages, failures=2):
+        super().__init__(pages)
+        self.failures = failures
+
+    def open(self, request, timeout=None):
+        if self.failures:
+            self.failures -= 1
+            raise urllib.error.URLError("temporary network error")
+        return super().open(request, timeout=timeout)
 
 
 SSECURITY = b"0123456789abcdef0123456789abcdef"
@@ -144,6 +158,14 @@ class CloudTest(unittest.TestCase):
         auth = AuthResult(123, "token", SSECURITY, FakeOpener([[missing, valid]]), "serviceToken=abc")
         until = XiaomiCloudClient(auth).get_raw_records(until_ms=1755927448000)
         self.assertEqual([r["createTime"] for r in until], [1755927447000])
+
+    def test_network_retry(self):
+        opener = FlakyOpener([[item(0)]], failures=2)
+        auth = AuthResult(123, "token", SSECURITY, opener, "serviceToken=abc")
+        with patch("mi_scale_exporter.cloud.time.sleep", return_value=None):
+            records = XiaomiCloudClient(auth).get_raw_records(limit=1)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(opener.failures, 0)
 
     def test_global_region_params(self):
         opener = FakeOpener([[item(0)]])

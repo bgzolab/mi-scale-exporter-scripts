@@ -122,6 +122,20 @@ class ParserTest(unittest.TestCase):
         assert measurement is not None
         self.assertEqual(measurement.source, "blt.3.1abc")
 
+    def test_snake_case_heart_rate_not_duplicated_in_extras(self):
+        import json
+
+        item = {
+            "model": "xiaomi.scales.ms116",
+            "createTime": 1792299577000,
+            "fromSource": 2,
+            "data": json.dumps({"weight": "63.15", "heart_rate": 70}),
+        }
+        measurement = parse_record(item)
+        assert measurement is not None
+        self.assertEqual(measurement.heart_rate_bpm, 70)
+        self.assertNotIn("heart_rate", measurement.extras)
+
     def test_source1(self):
         import json
 

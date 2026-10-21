@@ -19,6 +19,8 @@ GLOBAL_BASE_URL = "https://{region}.api.io.mi.com/app"
 SUPPORTED_REGIONS = {"cn", "de", "i2", "ru", "sg", "us"}
 DEFAULT_MODEL = "xiaomi.scales.ms116"  # Xiaomi Mijia S800
 DEFAULT_REGION = "cn"
+RETRY_ATTEMPTS = 3
+RETRY_DELAY_SECONDS = 0.5
 
 
 class CloudError(RuntimeError):
@@ -102,15 +104,27 @@ class XiaomiCloudClient:
             method="POST",
         )
 
-        try:
-            with self.auth.opener.open(request, timeout=self.timeout) as response:
-                raw = response.read()
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")[:300]
-            raise CloudError(f"小米云 HTTP {exc.code}: {detail}") from exc
-        except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
-            raise CloudError(f"无法连接小米云: {exc}") from exc
+        raw = b""
+        succeeded = False
+        last_network_error: Optional[Exception] = None
+        for attempt in range(1, RETRY_ATTEMPTS + 1):
+            try:
+                with self.auth.opener.open(request, timeout=self.timeout) as response:
+                    raw = response.read()
+                succeeded = True
+                break
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")[:300]
+                raise CloudError(f"小米云 HTTP {exc.code}: {detail}") from exc
+            except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+                last_network_error = exc
+                if attempt >= RETRY_ATTEMPTS:
+                    break
+                self._debug_log(f"网络错误，第 {attempt}/{RETRY_ATTEMPTS - 1} 次重试: {exc}")
+                time.sleep(RETRY_DELAY_SECONDS * attempt)
 
+        if not succeeded:
+            raise CloudError(f"无法连接小米云: {last_network_error}") from last_network_error
         if not raw:
             raise CloudError("小米云返回了空响应")
 

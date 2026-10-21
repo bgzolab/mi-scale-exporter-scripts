@@ -160,6 +160,25 @@ class AuthTest(unittest.TestCase):
         self.assertEqual(opener.calls, 2)
         finish.assert_called_once()
 
+    def test_poll_qr_login_rejects_error_response(self):
+        opener = PollOpener(
+            [
+                json.dumps(
+                    {"result": "error", "code": 100, "description": "二维码已过期"}
+                ).encode()
+            ]
+        )
+        challenge = auth.QrChallenge(
+            login_url="https://example.invalid/login",
+            qr_url="https://example.invalid/qr",
+            poll_url="https://example.invalid/poll",
+            timeout=10,
+            agent="test-agent",
+        )
+        with self.assertRaises(auth.AuthError) as ctx:
+            auth.poll_qr_login(opener, challenge, max_wait=10)
+        self.assertIn("二维码已过期", str(ctx.exception))
+
     def test_poll_qr_login_timeout(self):
         challenge = auth.QrChallenge(
             login_url="https://example.invalid/login",
