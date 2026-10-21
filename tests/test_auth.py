@@ -73,6 +73,19 @@ class BrokenReadOpener:
         return BrokenReadResponse()
 
 
+class FlakyPollOpener(PollOpener):
+    def __init__(self, bodies, failures=1):
+        super().__init__(bodies)
+        self.failures = failures
+
+    def open(self, request, timeout=None):
+        self.calls += 1
+        if self.failures:
+            self.failures -= 1
+            return BrokenReadResponse()
+        return PollResponse(next(self.bodies))
+
+
 class AuthTest(unittest.TestCase):
     def test_parse_jsonp(self):
         payload = {"result": "ok", "userId": 123}
@@ -185,6 +198,25 @@ class AuthTest(unittest.TestCase):
         self.assertEqual(result, "finished")
         self.assertEqual(opener.calls, 2)
         finish.assert_called_once()
+
+    def test_poll_qr_login_retries_on_network_error(self):
+        opener = FlakyPollOpener(
+            [json.dumps({"userId": 123, "passToken": "pt"}).encode()],
+            failures=1,
+        )
+        challenge = auth.QrChallenge(
+            login_url="https://example.invalid/login",
+            qr_url="https://example.invalid/qr",
+            poll_url="https://example.invalid/poll",
+            timeout=10,
+            agent="test-agent",
+        )
+        with patch.object(auth, "_finish_login", return_value="finished"), patch.object(
+            auth.time, "sleep", return_value=None
+        ):
+            result = auth.poll_qr_login(opener, challenge, max_wait=10)
+        self.assertEqual(result, "finished")
+        self.assertEqual(opener.calls, 2)
 
     def test_poll_qr_login_rejects_error_response(self):
         opener = PollOpener(

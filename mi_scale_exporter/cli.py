@@ -356,7 +356,7 @@ def command_export(args: argparse.Namespace) -> int:
             finally:
                 if should_close:
                     handle.close()
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:
             _error(f"写入输出失败: {exc}")
             return 1
         _info(f"已导出 {len(raw_records)} 条原始记录 -> {args.output}")
@@ -381,7 +381,7 @@ def command_export(args: argparse.Namespace) -> int:
         finally:
             if should_close:
                 handle.close()
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         _error(f"写入输出失败: {exc}")
         return 1
 
