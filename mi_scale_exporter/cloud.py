@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import http.client
 import json
-import socket
 import sys
 import time
 import urllib.error
@@ -116,7 +116,10 @@ class XiaomiCloudClient:
             except urllib.error.HTTPError as exc:
                 detail = exc.read().decode("utf-8", errors="replace")[:300]
                 raise CloudError(f"小米云 HTTP {exc.code}: {detail}") from exc
-            except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+            except (OSError, http.client.HTTPException) as exc:
+                # urllib wraps connect errors in URLError, but read-time
+                # failures can surface as raw ConnectionResetError or
+                # BadStatusLine / IncompleteRead.
                 last_network_error = exc
                 if attempt >= RETRY_ATTEMPTS:
                     break

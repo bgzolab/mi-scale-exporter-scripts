@@ -67,6 +67,33 @@ class FlakyOpener(FakeOpener):
         return super().open(request, timeout=timeout)
 
 
+class ReadErrorResponse:
+    def __init__(self, inner, state):
+        self.inner = inner
+        self.state = state
+
+    def read(self):
+        if self.state["remaining"]:
+            self.state["remaining"] -= 1
+            raise ConnectionResetError("connection reset while reading")
+        return self.inner.read()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class FlakyReadOpener(FakeOpener):
+    def __init__(self, pages):
+        super().__init__(pages)
+        self.state = {"remaining": 1}
+
+    def open(self, request, timeout=None):
+        return ReadErrorResponse(super().open(request, timeout=timeout), self.state)
+
+
 SSECURITY = b"0123456789abcdef0123456789abcdef"
 
 
@@ -166,6 +193,13 @@ class CloudTest(unittest.TestCase):
             records = XiaomiCloudClient(auth).get_raw_records(limit=1)
         self.assertEqual(len(records), 1)
         self.assertEqual(opener.failures, 0)
+
+    def test_read_time_network_error_is_retried(self):
+        opener = FlakyReadOpener([[item(0)], [item(0)]])
+        auth = AuthResult(123, "token", SSECURITY, opener, "serviceToken=abc")
+        with patch("mi_scale_exporter.cloud.time.sleep", return_value=None):
+            records = XiaomiCloudClient(auth).get_raw_records(limit=1)
+        self.assertEqual(len(records), 1)
 
     def test_global_region_params(self):
         opener = FakeOpener([[item(0)]])

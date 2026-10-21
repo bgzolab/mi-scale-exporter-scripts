@@ -249,6 +249,13 @@ def command_export(args: argparse.Namespace) -> int:
         _info("请先运行 `mi-scale-export login`，或设置环境变量 XIAOMI_USER_ID / XIAOMI_PASS_TOKEN。")
         return 2
 
+    if args.limit is not None and args.limit < 1:
+        _error("--limit 必须大于 0")
+        return 2
+    if args.max_pages < 1:
+        _error("--max-pages 必须大于 0")
+        return 2
+
     try:
         since_ms = to_ms(parse_time(args.since)) if args.since else None
         until_ms = to_ms(parse_time(args.until, end_of_day=True)) if args.until else None

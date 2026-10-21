@@ -155,6 +155,24 @@ class CliTest(unittest.TestCase):
             server.server_close()
             thread.join(timeout=5)
 
+    def test_invalid_pagination_arguments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"MI_SCALE_NO_ENV": "1"}):
+                code = cli.main(
+                    [
+                        "export",
+                        "--user-id",
+                        "123",
+                        "--pass-token",
+                        "pt",
+                        "--config",
+                        str(Path(tmp) / "credentials.json"),
+                        "--max-pages",
+                        "0",
+                    ]
+                )
+        self.assertEqual(code, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
