@@ -1,4 +1,5 @@
 import base64
+import io
 import json
 import unittest
 import urllib.error
@@ -92,6 +93,40 @@ class FlakyReadOpener(FakeOpener):
 
     def open(self, request, timeout=None):
         return ReadErrorResponse(super().open(request, timeout=timeout), self.state)
+
+
+class FlakyHttpOpener(FakeOpener):
+    def __init__(self, pages, failures=2, code=503):
+        super().__init__(pages)
+        self.failures = failures
+        self.code = code
+
+    def open(self, request, timeout=None):
+        if self.failures:
+            self.failures -= 1
+            raise urllib.error.HTTPError(
+                request.full_url,
+                self.code,
+                "temporary upstream error",
+                None,
+                io.BytesIO(b"temporary upstream error"),
+            )
+        return super().open(request, timeout=timeout)
+
+
+class FakePayloadOpener(FakeOpener):
+    def __init__(self, payload):
+        super().__init__([])
+        self.payload = payload
+
+    def open(self, request, timeout=None):
+        form = urllib.parse.parse_qs(request.data.decode())
+        nonce = base64.b64decode(form["_nonce"][0])
+        signed_nonce = gen_signed_nonce(SSECURITY, nonce)
+        encrypted = base64.b64encode(
+            rc4_crypt(signed_nonce, json.dumps(self.payload).encode())
+        )
+        return FakeResponse(encrypted)
 
 
 SSECURITY = b"0123456789abcdef0123456789abcdef"
@@ -200,6 +235,19 @@ class CloudTest(unittest.TestCase):
         with patch("mi_scale_exporter.cloud.time.sleep", return_value=None):
             records = XiaomiCloudClient(auth).get_raw_records(limit=1)
         self.assertEqual(len(records), 1)
+
+    def test_http_5xx_is_retried(self):
+        opener = FlakyHttpOpener([[item(0)]], failures=2, code=503)
+        auth = AuthResult(123, "token", SSECURITY, opener, "serviceToken=abc")
+        with patch("mi_scale_exporter.cloud.time.sleep", return_value=None):
+            records = XiaomiCloudClient(auth).get_raw_records(limit=1)
+        self.assertEqual(len(records), 1)
+
+    def test_non_dict_response_is_cloud_error(self):
+        opener = FakePayloadOpener([1, 2, 3])
+        auth = AuthResult(123, "token", SSECURITY, opener, "serviceToken=abc")
+        with self.assertRaises(CloudError):
+            XiaomiCloudClient(auth).get_raw_records()
 
     def test_global_region_params(self):
         opener = FakeOpener([[item(0)]])

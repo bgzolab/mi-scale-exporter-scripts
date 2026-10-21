@@ -155,6 +155,65 @@ class CliTest(unittest.TestCase):
             server.server_close()
             thread.join(timeout=5)
 
+    def test_login_saves_env_region_and_model(self):
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                config = Path(tmp) / "credentials.json"
+                no_save = Path(tmp) / "no-save.json"
+                with patch.object(
+                    auth,
+                    "ACCOUNT_SERVICE_LOGIN",
+                    f"http://127.0.0.1:{server.server_port}/pass/serviceLogin?_json=true&sid=xiaomiio",
+                ), patch.dict(
+                    os.environ,
+                    {
+                        "MI_SCALE_NO_ENV": "1",
+                        "XIAOMI_REGION": "us",
+                        "XIAOMI_SCALE_MODEL": "xiaomi.scales.ms113",
+                    },
+                ):
+                    code = cli.main(
+                        [
+                            "login",
+                            "--user-id",
+                            "123",
+                            "--pass-token",
+                            "pt",
+                            "--config",
+                            str(config),
+                        ]
+                    )
+                    no_save_code = cli.main(
+                        [
+                            "login",
+                            "--user-id",
+                            "123",
+                            "--pass-token",
+                            "pt",
+                            "--config",
+                            str(no_save),
+                            "--no-save",
+                        ]
+                    )
+                    missing_token_code = cli.main(
+                        ["login", "--user-id", "123", "--config", str(no_save)]
+                    )
+                self.assertEqual(code, 0)
+                self.assertEqual(no_save_code, 0)
+                self.assertEqual(missing_token_code, 2)
+                self.assertFalse(no_save.exists())
+                saved = json.loads(config.read_text(encoding="utf-8"))
+                self.assertEqual(saved["user_id"], 123)
+                self.assertEqual(saved["region"], "us")
+                self.assertEqual(saved["model"], "xiaomi.scales.ms113")
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+
     def test_invalid_pagination_arguments(self):
         with tempfile.TemporaryDirectory() as tmp:
             with patch.dict(os.environ, {"MI_SCALE_NO_ENV": "1"}):

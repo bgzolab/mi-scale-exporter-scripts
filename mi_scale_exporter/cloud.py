@@ -115,6 +115,13 @@ class XiaomiCloudClient:
                 break
             except urllib.error.HTTPError as exc:
                 detail = exc.read().decode("utf-8", errors="replace")[:300]
+                if exc.code in (429, 502, 503, 504) and attempt < RETRY_ATTEMPTS:
+                    last_network_error = exc
+                    self._debug_log(
+                        f"HTTP {exc.code}，第 {attempt}/{RETRY_ATTEMPTS - 1} 次重试"
+                    )
+                    time.sleep(RETRY_DELAY_SECONDS * attempt)
+                    continue
                 raise CloudError(f"小米云 HTTP {exc.code}: {detail}") from exc
             except (OSError, http.client.HTTPException) as exc:
                 # urllib wraps connect errors in URLError, but read-time
@@ -137,6 +144,8 @@ class XiaomiCloudClient:
         except Exception as exc:
             raise CloudError("小米云响应解密失败，可能是登录状态已失效") from exc
 
+        if not isinstance(payload, dict):
+            raise CloudError("小米云返回了意外的响应结构")
         code = payload.get("code")
         if str(code) != "0":
             message = payload.get("message") or payload.get("description") or f"code={code}"

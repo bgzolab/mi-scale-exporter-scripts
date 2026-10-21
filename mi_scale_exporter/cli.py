@@ -22,6 +22,7 @@ from .cloud import DEFAULT_MODEL, DEFAULT_REGION, CloudError, XiaomiCloudClient
 from .config import (
     ConfigError,
     default_config_path,
+    get_setting,
     load_config,
     load_env_file,
     resolve_connection_settings,
@@ -120,6 +121,11 @@ def _error(message: str) -> None:
     print(f"错误: {message}", file=sys.stderr)
 
 
+def _warn_json_suffix(fmt: str, output: Optional[str]) -> None:
+    if fmt == "json" and output not in (None, "-") and not output.lower().endswith(".json"):
+        _info("提示: 输出格式为 JSON，当前文件名不是 .json 后缀")
+
+
 def _print_qr(login_url: str, qr_url: str) -> None:
     _info("")
     _info("请用手机上的小米账号扫码，或在手机浏览器中打开下面的链接：")
@@ -182,8 +188,12 @@ def command_login(args: argparse.Namespace) -> int:
     except ConfigError as exc:
         _error(str(exc))
         return 1
-    region = str(args.region or config.get("region") or DEFAULT_REGION).strip().lower()
-    model = str(args.model or config.get("model") or DEFAULT_MODEL).strip()
+    region = str(
+        get_setting("region", args.region, config, "XIAOMI_REGION", DEFAULT_REGION)
+    ).strip().lower()
+    model = str(
+        get_setting("model", args.model, config, "XIAOMI_SCALE_MODEL", DEFAULT_MODEL)
+    ).strip()
 
     user_id = args.user_id or os.environ.get("XIAOMI_USER_ID")
     pass_token = args.pass_token or os.environ.get("XIAOMI_PASS_TOKEN")
@@ -268,12 +278,11 @@ def command_export(args: argparse.Namespace) -> int:
 
     if args.raw:
         fmt = "json"
-        if args.output not in (None, "-") and not args.output.lower().endswith(".json"):
-            _info("提示: --raw 输出格式固定为 JSON，当前文件名不是 .json 后缀")
         if args.format == "csv":
             _info("提示: --raw 会忽略 --format csv，实际输出 JSON")
     else:
         fmt = output_format(args.output, "json" if args.json else args.format)
+    _warn_json_suffix(fmt, args.output)
 
     try:
         _info("正在登录小米云...")
