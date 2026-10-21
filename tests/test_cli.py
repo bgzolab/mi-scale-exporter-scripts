@@ -282,21 +282,42 @@ class CliTest(unittest.TestCase):
     def test_invalid_pagination_arguments(self):
         with tempfile.TemporaryDirectory() as tmp:
             for flag in ("--max-pages", "--limit"):
-                with patch.dict(os.environ, {"MI_SCALE_NO_ENV": "1"}, clear=True):
-                    code = cli.main(
-                        [
-                            "export",
-                            "--user-id",
-                            "123",
-                            "--pass-token",
-                            "pt",
-                            "--config",
-                            str(Path(tmp) / "credentials.json"),
-                            flag,
-                            "0",
-                        ]
-                    )
-                self.assertEqual(code, 2)
+                for value in ("0", "-1"):
+                    with patch.dict(os.environ, {"MI_SCALE_NO_ENV": "1"}, clear=True):
+                        code = cli.main(
+                            [
+                                "export",
+                                "--user-id",
+                                "123",
+                                "--pass-token",
+                                "pt",
+                                "--config",
+                                str(Path(tmp) / "credentials.json"),
+                                flag,
+                                value,
+                            ]
+                        )
+                    self.assertEqual(code, 2)
+
+    def test_invalid_time_range(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"MI_SCALE_NO_ENV": "1"}, clear=True):
+                code = cli.main(
+                    [
+                        "export",
+                        "--user-id",
+                        "123",
+                        "--pass-token",
+                        "pt",
+                        "--config",
+                        str(Path(tmp) / "credentials.json"),
+                        "--since",
+                        "2026-10-20",
+                        "--until",
+                        "2026-10-19",
+                    ]
+                )
+        self.assertEqual(code, 2)
 
 
 if __name__ == "__main__":

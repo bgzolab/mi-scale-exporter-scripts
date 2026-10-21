@@ -92,6 +92,11 @@ def output_format(path: Optional[str], requested: Optional[str] = None) -> str:
 def open_output(path: Optional[str], fmt: str):
     """Return ``(handle, should_close)`` for stdout or a file path."""
     if not path or path == "-":
+        if fmt == "csv" and hasattr(sys.stdout, "reconfigure"):
+            try:
+                sys.stdout.reconfigure(encoding="utf-8-sig", newline="")
+            except (OSError, ValueError):
+                pass
         return sys.stdout, False
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)

@@ -276,6 +276,8 @@ def poll_qr_login(
             headers={"User-Agent": challenge.agent or generate_agent()},
         )
         try:
+            # Xiaomi may hold this long-poll for >90s.  A 40s client cap keeps
+            # the loop responsive and simply reconnects if nothing happened.
             with opener.open(request, timeout=min(40.0, remaining)) as response:
                 body = response.read().decode("utf-8", errors="replace")
             data = parse_login_json(body) if body.strip() else {}

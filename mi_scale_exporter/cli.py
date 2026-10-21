@@ -309,6 +309,8 @@ def command_export(args: argparse.Namespace) -> int:
         if args.format == "csv":
             _info("提示: --raw 会忽略 --format csv，实际输出 JSON")
     else:
+        if args.json and args.format == "csv":
+            _info("提示: --json 会覆盖 --format csv，实际输出 JSON")
         fmt = output_format(args.output, "json" if args.json else args.format)
     _warn_extension_mismatch(fmt, args.output)
 
