@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mi-scale-exporter"
+version = "0.1.0"
+description = "Export Xiaomi body-composition scale data from Xiaomi Cloud (S800/S400, CN)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENCE" }
+authors = [{ name = "bgzo" }]
+dependencies = []
+
+[project.optional-dependencies]
+qr = ["qrcode>=7.4"]
+
+[project.scripts]
+mi-scale-export = "mi_scale_exporter.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mi_scale_exporter*"]
